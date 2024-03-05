@@ -10,6 +10,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import { BarChart3 } from 'lucide-react';
+
 
 
 const TemperaturePlot = dynamic(() => import('../components/TemperaturePlot'), {
@@ -17,8 +19,9 @@ const TemperaturePlot = dynamic(() => import('../components/TemperaturePlot'), {
 });
 
 
-// SPEC: should be able to upload event_log, channels_log, and plot them.
+// SPEC: should be able to upload channels_log, and plot them.
 // THEN, should be able to annotate a section into a timeline, and share the results
+// TODO Monday: make annotations prettier, make data table / add events work, switch timeline to milliseconds, work on PDF format, upload CSV
 
 
 
@@ -41,14 +44,11 @@ export default function Page() {
   return (
     <div>
       <div className="bg-white w-full h-16 fixed top-0 z-10 shadow-md">
-       <h1 className="font-semibold m-4 text-xl">AnnotateAnomalies</h1>
+       <h1 className="font-semibold m-4 text-xl">     <BarChart3 /> AnomalyReport</h1>
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <Card>
         <TemperaturePlot temperatureData={temperatureData} events={events} />
-        <div className="m-4"></div></Card>
-        Hello pt. 2
       </div>
 
       {/* Footer */}
