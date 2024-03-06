@@ -5,8 +5,8 @@
 @layer base {
 
   body {
-    background-image: linear-gradient(to right, rgb(250, 244, 255), hsla(210, 40%, 98%, 1));
-    color: hsl(222.2, 84%, 4.9%);
+    background: linear-gradient(39deg, rgba(58,132,94,0.25) 0%, rgba(255,255,255,1) 100%);
+        color: hsl(222.2, 84%, 4.9%);
   }
 
   :root {
