@@ -78,6 +78,8 @@ export default function TemperaturePlot() {
 
   const [newEvent, setNewEvent] = useState<{ time: string; event: string }>({ time: '', event: '' });
 
+  const [profile, setProfile] = useState<{ reportName: string; authorName: string }>({ reportName: '', authorName: '' });
+
   const [selectedChannel, setSelectedChannel] = useState<string>('');
 
   const channels = Object.keys(channelData[0]).filter(key => key !== 'time');
@@ -86,22 +88,23 @@ export default function TemperaturePlot() {
 
   const [isFileUploaded, setIsFileUploaded] = useState<boolean>(false);
 
+  const [captions, setCaptions] = useState<{ [channel: string]: string }>({});
+
+
 
 
 
   const plotData: Partial<ScatterData>[] = [
     {
-      type: 'scatter', // Explicitly typed as 'scatter'
+      type: 'scatter',
       mode: 'lines+markers',
       x: channelData.map(data => data.time),
       y: channelData.map(data => data[selectedChannel]),
       name: selectedChannel.charAt(0).toUpperCase() + selectedChannel.slice(1),
-      line: { color: '#3a845e' }, // Assuming your line object structure is correct
-      marker: { color: '#3a845e' } // Assuming your marker object structure is correct
+      line: { color: '#5f7897' },
+      marker: { color: '#5f7897' }
     }
   ];
-
-
 
   useEffect(() => {
     if (channels.length > 0 && !selectedChannel) {
@@ -145,14 +148,16 @@ export default function TemperaturePlot() {
     });
   };
 
-
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setNewEvent({ ...newEvent, [e.target.name]: e.target.value });
   };
 
   const addEvent = () => {
     if (newEvent.time && newEvent.event) {
+      if (Number.isNaN(Number(newEvent.time))) {
+        alert('Time field is not a number.');
+        return;
+      }
       const updatedEvents = { ...events };
       // get current channel events by indexing events copy with channel name
       const currentChannelEvents = updatedEvents[selectedChannel] || [];
@@ -162,28 +167,31 @@ export default function TemperaturePlot() {
       };
       updatedEvents[selectedChannel] = [...currentChannelEvents, channelEvent];
       setEvents(updatedEvents);
-      setNewEvent({ time: '', event: '' }); // Reset newEvent state
+      setNewEvent({ time: '', event: '' });
     } else {
-      alert('Please fill in all fields.');
+      alert('Time field is not a number.');
     }
   };
 
 
   const addGlobalEvent = () => {
     if (newEvent.time && newEvent.event) {
-      // Directly use the existing array and add the new event to it
+      if (Number.isNaN(Number(newEvent.time))) {
+        alert('Please fill in all fields.');
+        return;
+      }
       let channelEvent = {
         time: Number(newEvent.time),
         eventName: newEvent.event
       };
-      const updatedGlobalEvents = [...globalEvents, channelEvent]; // Correctly update the array
+      const updatedGlobalEvents = [...globalEvents, channelEvent];
       setGlobalEvents(updatedGlobalEvents);
-      setNewEvent({ time: '', event: '' }); // Reset newEvent state
+      setNewEvent({ time: '', event: '' });
     } else {
       alert('Please fill in all fields.');
     }
   };
-  
+
   function interpolateValue(time: number, channel: string): number {
     const times = channelData.map(data => data.time);
     const values = channelData.map(data => data[channel as keyof typeof data]);
@@ -213,42 +221,153 @@ export default function TemperaturePlot() {
   }
 
   const downloadPdf = () => {
-    if (!plotRef.current) {
-      console.error('Plotly component reference is not available.');
+    if (channelData.length === 0 || !channelData[0]) {
+      console.error('Channel data is empty or contains null/undefined values.');
       return;
     }
 
-    Plotly.toImage(plotRef.current.el, {
-      format: 'png',
-      width: 800,
-      height: 600
-    }).then(function (dataUrl: string) {
-      const pdf = new JsPDF({
-        orientation: 'portrait',
-      });
+    const channels = Object.keys(channelData[0]).filter(key => key !== 'time');
 
-      pdf.setFontSize(20);
-      pdf.text('Temperature Report', 20, 20);
+    const getAnnotations = (channel: string): Partial<Annotations>[] => {
+      const annotations = events ? events[channel]?.map(event => ({
+        x: event.time,
+        y: interpolateValue(event.time, channel),
+        text: event.eventName,
+        showarrow: true,
+        arrowhead: 3,
+        ax: 0,
+        ay: -80,
+        bordercolor: '#64748b',
+        bgcolor: '#64748b',
+        font: {
+          family: 'Inter',
+          size: 20,
+          color: 'white',
+        },
+        borderwidth: 2,
+        borderpad: 4,
+        opacity: 1.0
+      })) || [] : [];
 
-      pdf.setFontSize(12);
-      pdf.text('This report provides an overview of temperature data and events.', 20, 30);
 
-      pdf.addImage(dataUrl, 'PNG', 10, 40, 280, 210);
+      const criticalAnnotations = globalEvents?.map(event => ({
+        x: event.time,
+        y: interpolateValue(event.time, channel),
+        text: event.eventName,
+        showarrow: true,
+        arrowhead: 3,
+        ax: 0,
+        ay: -80,
+        bordercolor: '#fa7316',
+        bgcolor: '#fa7316',
+        font: {
+          family: 'Inter',
+          size: 20,
+          color: 'white',
+        },
+        borderwidth: 2,
+        borderpad: 4,
+        opacity: 1.0
+      })) || [];
 
-      pdf.text('Detailed Analysis', 20, 260);
-      pdf.setFontSize(10);
-      pdf.text('Here you can add more detailed analysis about the temperature trends, observations, and any other relevant information.', 20, 265);
+      const total = [...annotations, ...criticalAnnotations];
 
-      pdf.save('temperature-report.pdf');
-    }).catch((error: any) => {
-      console.error('Error generating plot image:', error);
+      return total
+    }
+
+    const plotsData: Plotly.Data[] = channels.map((channel: string) => {
+      return {
+        x: channelData.map(data => data.time),
+        y: channelData.map(data => data[channel]),
+        type: 'scatter',
+        mode: 'lines+markers',
+        name: channel,
+        line: { color: '#5f7897', width: 6 },
+        marker: { color: '#5f7897', size: 12 },
+      };
     });
+
+    const plotWidth = 1200;
+    const plotHeight = 800;
+
+    const pageWidth = 210;
+    const pageHeight = 297;
+    const margin = 10;
+    const yGap = 20;
+    const scaleDown = .075;
+
+    const plotsLayout = (channelName: string | undefined) => ({
+      font: {
+        family: "Inter",
+        size: 24,
+      },
+      margin: { l: 50, r: 20, t: 20, b: 40 },
+      paper_bgcolor: 'rgba(0,0,0,0)',
+      plot_bgcolor: 'rgba(0,0,0,0)',
+      annotations: channelName ? getAnnotations(channelName) : []
+    });
+
+    const plotPromises = plotsData.map((data, index) => {
+      const plotId = `hidden-plot-${index}`;
+      const plotDiv = document.createElement('div');
+      plotDiv.id = plotId;
+      plotDiv.style.display = 'none'; // Hide the plot div
+      document.body.appendChild(plotDiv);
+
+
+      return Plotly.newPlot(plotId, [data], plotsLayout(data.name), { displayModeBar: false })
+        .then(() => Plotly.toImage(plotId, { format: 'png', width: plotWidth, height: plotHeight }))
+        .then((dataUrl: string) => {
+          // Remove the hidden plot div from the DOM after exporting its image
+          plotDiv.remove();
+          return { imageUrl: dataUrl, title: data.name }; // Return image URL and plot title
+        });
+    });
+
+    Promise.all(plotPromises)
+      .then(imageDataArray => {
+        const pdf = new JsPDF({
+          orientation: 'portrait',
+        });
+
+        let yOffset = margin + 30; // Adjusted for header
+        let page = 1;
+
+        imageDataArray.forEach(({ imageUrl, title }, index) => {
+          if (index > 0 && index % 2 === 0) {
+            yOffset += (plotHeight * scaleDown) + yGap; // Move to the next row
+          }
+
+          if (yOffset + (plotHeight * scaleDown) + 70 > pageHeight - margin) {
+            pdf.addPage(); // Add a new page if there's not enough space for the next plot
+            yOffset = margin + 30; // Reset to margin + header height
+            page++;
+          }
+
+
+          const xOffset = margin + (index % 2) * ((plotWidth * scaleDown) + margin);
+          pdf.addImage(imageUrl, 'PNG', xOffset, yOffset, (plotWidth * scaleDown), plotHeight * (scaleDown)); // Resize image to fit on the page
+
+          pdf.setFontSize(14);
+          pdf.text(`${title}`, xOffset, yOffset - 2);
+
+          pdf.setFontSize(8);
+          pdf.text(title ? (captions[title] || "") : "", xOffset, yOffset + 6 + (plotHeight * scaleDown));
+
+          if (index === 0) {
+            pdf.setFontSize(24);
+            pdf.text(`${profile.reportName}`, margin, margin + 5);
+            pdf.setFontSize(12);
+            pdf.text("Report Prepared by: " + `${profile.authorName}`, margin, margin + 12);
+
+          }
+        });
+        pdf.save(`anomaly-report.pdf`);
+      })
+      .catch((error: any) => {
+        console.error('Error generating plot images:', error);
+      });
   };
-
-
-
-
-
 
   const annotations = events ? events[selectedChannel]?.map(event => ({
     x: event.time,
@@ -260,13 +379,19 @@ export default function TemperaturePlot() {
     arrowhead: 3,
     ax: 0,
     ay: -40,
-    bordercolor: '#c7c7c7',
+    bordercolor: '#64748b',
+    bgcolor: '#64748b',
+    font: {
+      family: 'Inter',
+      size: 10,
+      color: 'white',
+    },
     borderwidth: 1,
     borderpad: 4,
-    opacity: 0.8
+    opacity: 1.0
   })) || [] : [];
 
-  
+
   const criticalAnnotations = globalEvents?.map(event => ({
     x: event.time,
     y: interpolateValue(event.time, selectedChannel),
@@ -277,15 +402,32 @@ export default function TemperaturePlot() {
     arrowhead: 3,
     ax: 0,
     ay: -40,
-    bordercolor: 'red', // Set to red for critical events
+    bordercolor: '#fa7316',
+    bgcolor: '#fa7316',
+    font: {
+      family: 'Inter',
+      size: 10,
+      color: 'white',
+    },
     borderwidth: 1,
     borderpad: 4,
-    opacity: 0.8
+    opacity: 1.0
   })) || [];
-  
-  const combinedAnnotations = [...annotations, ...criticalAnnotations];
-  
 
+  const combinedAnnotations = [...annotations, ...criticalAnnotations];
+
+  const handleReportNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setProfile({ ...profile, reportName: event.target.value });
+  };
+
+  const handleAuthorNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setProfile({ ...profile, authorName: event.target.value });
+  };
+
+  const handleCaptionChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    // Update the captions object with the new caption for the selected channel
+    setCaptions({ ...captions, [selectedChannel]: event.target.value });
+  };
 
 
 
@@ -297,9 +439,16 @@ export default function TemperaturePlot() {
           <div>
             <Popover>
               <PopoverTrigger><Button variant="outline">   Edit Profile  <ChevronDown className='ml-1 h-4 w-4' /></Button></PopoverTrigger>
-              <PopoverContent className='w-[400px]'>
-                <Input placeholder='Company Name' className="m-4"></Input>
-                <Input placeholder='Author Name' className="m-4"></Input>
+              <PopoverContent className='w-[400px] p-4'>
+                <div className='mr-6'>
+                  <Input
+                    value={profile.reportName}
+                    onChange={handleReportNameChange}
+                    placeholder='Report Name' className="m-4"></Input>
+                  <Input
+                    value={profile.authorName}
+                    onChange={handleAuthorNameChange}
+                    placeholder='Author Name' className="m-4"></Input></div>
               </PopoverContent>
             </Popover>
             <Button onClick={downloadPdf} disabled={!isFileUploaded} className="ml-2 button-class">Download Report</Button>
@@ -337,8 +486,8 @@ export default function TemperaturePlot() {
                 <Plot
                   data={plotData.map(trace => ({
                     ...trace,
-                    line: { ...trace.line, color: '#3a845e' },
-                    marker: { ...trace.marker, color: '#3a845e' }
+                    line: { ...trace.line, color: '#415368' },
+                    marker: { ...trace.marker, color: '#415368' }
                   }))}
                   layout={{
                     xaxis: { type: 'linear' },
@@ -346,7 +495,6 @@ export default function TemperaturePlot() {
                     font: {
                       family: "Inter",
                       size: 12,
-                      color: "#000"
                     },
                     margin: { l: 50, r: 20, t: 20, b: 20 }
                   }}
@@ -354,31 +502,34 @@ export default function TemperaturePlot() {
                   className="w-[600px] h-[400px]"
                 />
               ) : (
-                <div className="flex justify-center items-center ml-7 w-[600px] h-[400px]" style={{ backgroundColor: '#f0f0f0' }}>
+                <div className="flex justify-center items-center ml-7 w-[600px] h-[400px]" style={{ backgroundColor: '#f2f5f9' }}>
                   <span className="text-gray-500">Upload a CSV file to begin annotating.</span>
                 </div>
               )
             }
 
             <Input
-              type="string"
+              type="text" // The correct type for text inputs is "text", not "string"
               name="time"
               placeholder="Plot Caption"
               className="input-class ml-7 mt-2 w-[600px] mb-5"
               disabled={!isFileUploaded}
+              value={captions[selectedChannel] || ''} // Display the current caption if available
+              onChange={handleCaptionChange}
             />
+
           </div>
 
           <div className="card-class flex ml-5 w-[400px] h-[550px]">
             <Tabs defaultValue="events" className="w-[400px] mr-4 mt-6">
               <TabsList className='w-[400px] text-xl'>
-                <TabsTrigger value="events" className='w-[200px]'>Critical Events</TabsTrigger>
-                <TabsTrigger value="annotations" className='w-[200px]'>Annotations</TabsTrigger>
+                <TabsTrigger value="events" className='w-[200px]'><div className='w-5 h-2.5 bg-[#fa7316] mr-2 rounded-sm'></div>Critical Events</TabsTrigger>
+                <TabsTrigger value="annotations" className='w-[200px]'><div className='w-5 h-2.5 bg-[#64748b] mr-2 rounded-sm'></div>Annotations</TabsTrigger>
               </TabsList>
               <TabsContent value="events">
                 <CardDescription className='ml-3 mt-4 mb-4'>Label critical events here. These will be visible on all channel plots.</CardDescription>
                 <div className="">
-                  <ScrollArea className=" w-150 h-[347px] rounded-md border-0 mr-5">
+                  <ScrollArea className=" w-150 h-[354px] rounded-md border-0 mr-5">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -406,7 +557,7 @@ export default function TemperaturePlot() {
                   </ScrollArea>
                   <div className="flex items-center space-x-2 p-3">
                     <Input
-                      type="text"
+                      type="number"
                       name="time"
                       placeholder="Time"
                       value={newEvent.time}
@@ -430,9 +581,9 @@ export default function TemperaturePlot() {
                 </div>
               </TabsContent>
               <TabsContent value="annotations">
-              <CardDescription className='ml-3 mt-4 mb-4'>Add annotations to specific channels here. These labels will only appear on the {isFileUploaded ? `${selectedChannel}` : "selected"} plot.</CardDescription>
+                <CardDescription className='ml-3 mt-4 mb-4'>Add annotations to specific channels here. These labels will only appear on the {isFileUploaded ? `${selectedChannel}` : "selected"} plot.</CardDescription>
                 <div className="">
-                  <ScrollArea className=" w-150 h-[347px] rounded-md border-0 mr-5">
+                  <ScrollArea className=" w-150 h-[354px] rounded-md border-0 mr-5">
                     <Table>
                       <TableHeader>
                         <TableRow>
