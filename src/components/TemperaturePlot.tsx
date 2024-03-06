@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, useRef, useEffect } from 'react';
 import Plot from 'react-plotly.js';
 import JsPDF from 'jspdf';
@@ -40,6 +42,10 @@ import {
 import { Channel } from 'diagnostics_channel';
 import { select } from 'd3';
 import { Check } from 'lucide-react';
+import Papa from 'papaparse';
+import { ScatterData } from 'plotly.js';
+
+
 
 
 interface ChannelData {
@@ -56,15 +62,19 @@ interface ChannelAnnotationsIndex {
   [key: string]: ChannelEvent[]
 }
 
-interface Props {
-  channelData: Array<ChannelData>;
-}
 
 
 
-const TemperaturePlot: React.FC<Props> = ({ channelData }) => {
+export default function TemperaturePlot() {
+
+  const [channelData, setChannelData] = useState<ChannelData[]>([{
+    time: 0,
+    "No file": 0,
+  }]);
 
   const [events, setEvents] = useState<ChannelAnnotationsIndex>({});
+
+  const [globalEvents, setGlobalEvents] = useState<ChannelEvent[]>([]);
 
   const [newEvent, setNewEvent] = useState<{ time: string; event: string }>({ time: '', event: '' });
 
@@ -74,7 +84,22 @@ const TemperaturePlot: React.FC<Props> = ({ channelData }) => {
 
   const plotRef = useRef<any>(null);
 
+  const [isFileUploaded, setIsFileUploaded] = useState<boolean>(false);
 
+
+
+
+  const plotData: Partial<ScatterData>[] = [
+    {
+      type: 'scatter', // Explicitly typed as 'scatter'
+      mode: 'lines+markers',
+      x: channelData.map(data => data.time),
+      y: channelData.map(data => data[selectedChannel]),
+      name: selectedChannel.charAt(0).toUpperCase() + selectedChannel.slice(1),
+      line: { color: '#3a845e' }, // Assuming your line object structure is correct
+      marker: { color: '#3a845e' } // Assuming your marker object structure is correct
+    }
+  ];
 
 
 
@@ -84,6 +109,41 @@ const TemperaturePlot: React.FC<Props> = ({ channelData }) => {
     }
   }, [channels, selectedChannel]);
 
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    Papa.parse<ChannelData>(file, {
+      header: true,
+      dynamicTyping: true,
+      skipEmptyLines: true,
+      complete: (result) => {
+        const data = result.data;
+        const isValid = data.every(d =>
+          Object.keys(d).every(key =>
+            typeof d[key] === 'number'
+          )
+        );
+
+        if (isValid && result.meta && result.meta.fields) {
+          const fields = result.meta.fields;
+          const firstNonTimeField = fields.find(field => field !== 'time');
+
+          if (firstNonTimeField) {
+            setSelectedChannel(firstNonTimeField);
+          }
+          setIsFileUploaded(true); // Set to true if file is successfully processed
+          setChannelData(data);
+          setEvents({});
+
+        } else {
+          alert('Invalid CSV format.');
+        }
+      },
+    });
+  };
 
 
 
@@ -109,6 +169,21 @@ const TemperaturePlot: React.FC<Props> = ({ channelData }) => {
   };
 
 
+  const addGlobalEvent = () => {
+    if (newEvent.time && newEvent.event) {
+      // Directly use the existing array and add the new event to it
+      let channelEvent = {
+        time: Number(newEvent.time),
+        eventName: newEvent.event
+      };
+      const updatedGlobalEvents = [...globalEvents, channelEvent]; // Correctly update the array
+      setGlobalEvents(updatedGlobalEvents);
+      setNewEvent({ time: '', event: '' }); // Reset newEvent state
+    } else {
+      alert('Please fill in all fields.');
+    }
+  };
+  
   function interpolateValue(time: number, channel: string): number {
     const times = channelData.map(data => data.time);
     const values = channelData.map(data => data[channel as keyof typeof data]);
@@ -164,16 +239,6 @@ const TemperaturePlot: React.FC<Props> = ({ channelData }) => {
       pdf.setFontSize(10);
       pdf.text('Here you can add more detailed analysis about the temperature trends, observations, and any other relevant information.', 20, 265);
 
-      autoTable(pdf, {
-        head: [['Time', 'Temperature', 'Event']],
-        body: temperatureData.map((data, index) => [
-          data.time,
-          data.temperature.toString(),
-          events[index] ? events[index].event : 'N/A'
-        ]),
-        startY: 270,
-      });
-
       pdf.save('temperature-report.pdf');
     }).catch((error: any) => {
       console.error('Error generating plot image:', error);
@@ -181,15 +246,9 @@ const TemperaturePlot: React.FC<Props> = ({ channelData }) => {
   };
 
 
-  const plotData = [
-    {
-      type: 'scatter',
-      mode: 'lines+markers',
-      x: channelData.map(data => data.time),
-      y: channelData.map(data => data[selectedChannel]),
-      name: selectedChannel.charAt(0).toUpperCase() + selectedChannel.slice(1),
-    },
-  ];
+
+
+
 
   const annotations = events ? events[selectedChannel]?.map(event => ({
     x: event.time,
@@ -207,6 +266,26 @@ const TemperaturePlot: React.FC<Props> = ({ channelData }) => {
     opacity: 0.8
   })) || [] : [];
 
+  
+  const criticalAnnotations = globalEvents?.map(event => ({
+    x: event.time,
+    y: interpolateValue(event.time, selectedChannel),
+    xref: 'x',
+    yref: 'y',
+    text: event.eventName,
+    showarrow: true,
+    arrowhead: 3,
+    ax: 0,
+    ay: -40,
+    bordercolor: 'red', // Set to red for critical events
+    borderwidth: 1,
+    borderpad: 4,
+    opacity: 0.8
+  })) || [];
+  
+  const combinedAnnotations = [...annotations, ...criticalAnnotations];
+  
+
 
 
 
@@ -214,28 +293,28 @@ const TemperaturePlot: React.FC<Props> = ({ channelData }) => {
     <div>
       <Card className='mb-3 p-2'>
         <div className="flex justify-between items-center">
-          <Button variant="outline">Upload File</Button>
+          <Input type="file" className='w-[250px]' accept=".csv" onChange={handleFileUpload} />
           <div>
             <Popover>
-              <PopoverTrigger><Button variant="outline">   Edit Details  <ChevronDown className='ml-1 h-4 w-4' /></Button></PopoverTrigger>
+              <PopoverTrigger><Button variant="outline">   Edit Profile  <ChevronDown className='ml-1 h-4 w-4' /></Button></PopoverTrigger>
               <PopoverContent className='w-[400px]'>
                 <Input placeholder='Company Name' className="m-4"></Input>
                 <Input placeholder='Author Name' className="m-4"></Input>
               </PopoverContent>
             </Popover>
-            <Button onClick={downloadPdf} className="ml-2 button-class">Download Report</Button>
+            <Button onClick={downloadPdf} disabled={!isFileUploaded} className="ml-2 button-class">Download Report</Button>
           </div>
         </div>
       </Card>
       <Card className='p-4'>
         <div className="flex">
-          <div>
+          <div className='h-[550px]'>
             <CardHeader>
               <div className="flex justify-between items-center">
                 <CardTitle>Channel Plot:</CardTitle>
                 <div>
                   <DropdownMenu>
-                    <DropdownMenuTrigger><Button variant="outline">{selectedChannel} <ChevronDown className='ml-1 h-4 w-4' /></Button></DropdownMenuTrigger>
+                    <DropdownMenuTrigger disabled={!isFileUploaded}><Button variant="outline" disabled={!isFileUploaded} >{selectedChannel} <ChevronDown className='ml-1 h-4 w-4' /></Button></DropdownMenuTrigger>
                     <DropdownMenuContent>
                       {channels.map(channel => (
                         <DropdownMenuItem key={channel} onSelect={() => setSelectedChannel(channel)}>
@@ -253,42 +332,107 @@ const TemperaturePlot: React.FC<Props> = ({ channelData }) => {
               </div>
 
             </CardHeader>
-            <Plot
-              data={plotData.map(trace => ({
-                ...trace,
-                line: { ...trace.line, color: '#3a845e' },
-                marker: { ...trace.marker, color: '#3a845e' }
-              })) as Data[]}
-              layout={{
-                xaxis: { type: 'linear' },
-                annotations: annotations as Partial<Annotations>[],
-                font: {
-                  family: "Inter",
-                  size: 12,
-                  color: "#000"
-                },
-                margin: { l: 50, r: 20, t: 20, b: 20 }
-              }}
-              ref={plotRef}
-            />
+            {
+              isFileUploaded ? (
+                <Plot
+                  data={plotData.map(trace => ({
+                    ...trace,
+                    line: { ...trace.line, color: '#3a845e' },
+                    marker: { ...trace.marker, color: '#3a845e' }
+                  }))}
+                  layout={{
+                    xaxis: { type: 'linear' },
+                    annotations: combinedAnnotations as Partial<Annotations>[],
+                    font: {
+                      family: "Inter",
+                      size: 12,
+                      color: "#000"
+                    },
+                    margin: { l: 50, r: 20, t: 20, b: 20 }
+                  }}
+                  ref={plotRef}
+                  className="w-[600px] h-[400px]"
+                />
+              ) : (
+                <div className="flex justify-center items-center ml-7 w-[600px] h-[400px]" style={{ backgroundColor: '#f0f0f0' }}>
+                  <span className="text-gray-500">Upload a CSV file to begin annotating.</span>
+                </div>
+              )
+            }
+
             <Input
               type="string"
               name="time"
               placeholder="Plot Caption"
-              className="input-class ml-4 w-[650px] mb-5"
+              className="input-class ml-7 mt-2 w-[600px] mb-5"
+              disabled={!isFileUploaded}
             />
           </div>
 
-          <div className="card-class ml-5 w-[400px]">
-            <Tabs defaultValue="account" className="w-[400px] mr-4 mt-6">
+          <div className="card-class flex ml-5 w-[400px] h-[550px]">
+            <Tabs defaultValue="events" className="w-[400px] mr-4 mt-6">
               <TabsList className='w-[400px] text-xl'>
-                <TabsTrigger value="account" className='w-[200px]'>Critical Events</TabsTrigger>
-                <TabsTrigger value="password" className='w-[200px]'>Annotations</TabsTrigger>
+                <TabsTrigger value="events" className='w-[200px]'>Critical Events</TabsTrigger>
+                <TabsTrigger value="annotations" className='w-[200px]'>Annotations</TabsTrigger>
               </TabsList>
-              <TabsContent value="account">
-                <CardDescription className='ml-3 mt-4 mb-4'>Make channel-specific annotations here:</CardDescription>
-                <div>
-                  <ScrollArea className="h-72 w-150 rounded-md border-0 mr-5">
+              <TabsContent value="events">
+                <CardDescription className='ml-3 mt-4 mb-4'>Label critical events here. These will be visible on all channel plots.</CardDescription>
+                <div className="">
+                  <ScrollArea className=" w-150 h-[347px] rounded-md border-0 mr-5">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[50px]">Time</TableHead>
+                          <TableHead>Event</TableHead>
+                          <TableHead className="w-[50px]">Options</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {
+                          globalEvents?.map((event, index) => (
+                            <TableRow key={index}>
+                              <TableCell className="font-medium">{event.time}</TableCell>
+                              <TableCell>{event.eventName}</TableCell>
+                              <TableCell>
+                                <Button variant="outline" className='m-1'>
+                                  <Trash2 className='h-4 w-4' />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        }
+                      </TableBody>
+                    </Table>
+                  </ScrollArea>
+                  <div className="flex items-center space-x-2 p-3">
+                    <Input
+                      type="text"
+                      name="time"
+                      placeholder="Time"
+                      value={newEvent.time}
+                      onChange={handleInputChange}
+                      className="input-class w-[100px]"
+                      disabled={!isFileUploaded}
+                    />
+                    <Input
+                      type="text"
+                      name="event"
+                      placeholder="Event"
+                      value={newEvent.event}
+                      onChange={handleInputChange}
+                      className="input-class w-[200px]"
+                      disabled={!isFileUploaded}
+                    />
+                    <Button onClick={addGlobalEvent} disabled={!isFileUploaded} variant="outline" className="button-class">
+                      Add
+                    </Button>
+                  </div>
+                </div>
+              </TabsContent>
+              <TabsContent value="annotations">
+              <CardDescription className='ml-3 mt-4 mb-4'>Add annotations to specific channels here. These labels will only appear on the {isFileUploaded ? `${selectedChannel}` : "selected"} plot.</CardDescription>
+                <div className="">
+                  <ScrollArea className=" w-150 h-[347px] rounded-md border-0 mr-5">
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -322,6 +466,7 @@ const TemperaturePlot: React.FC<Props> = ({ channelData }) => {
                       value={newEvent.time}
                       onChange={handleInputChange}
                       className="input-class w-[100px]"
+                      disabled={!isFileUploaded}
                     />
                     <Input
                       type="text"
@@ -330,14 +475,15 @@ const TemperaturePlot: React.FC<Props> = ({ channelData }) => {
                       value={newEvent.event}
                       onChange={handleInputChange}
                       className="input-class w-[200px]"
+                      disabled={!isFileUploaded}
                     />
-                    <Button onClick={addEvent} variant="outline" className="button-class">
+                    <Button onClick={addEvent} disabled={!isFileUploaded} variant="outline" className="button-class">
                       Add
                     </Button>
                   </div>
                 </div>
+
               </TabsContent>
-              <TabsContent value="password">Change your password here.</TabsContent>
             </Tabs>
 
           </div>
@@ -349,5 +495,3 @@ const TemperaturePlot: React.FC<Props> = ({ channelData }) => {
 
   );
 };
-
-export default TemperaturePlot;

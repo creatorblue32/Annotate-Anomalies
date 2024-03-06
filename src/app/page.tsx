@@ -1,5 +1,4 @@
 // src/pages/page.tsx
-"use client";
 
 import dynamic from 'next/dynamic';
 import {
@@ -11,6 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { BarChart3 } from 'lucide-react';
+import { Metadata } from 'next';
 
 
 
@@ -19,9 +19,12 @@ const TemperaturePlot = dynamic(() => import('../components/TemperaturePlot'), {
 });
 
 
-// SPEC: should be able to upload channels_log, and plot them.
-// THEN, should be able to annotate a section into a timeline, and share the results
-// TODO Monday: make annotations prettier, make data table / add events work, switch timeline to milliseconds, work on PDF format, upload CSV
+export const metadata: Metadata = {
+  title: 'AnomalyReport',
+  metadataBase: new URL('https://next-learn-dashboard.vercel.sh'),
+};
+
+
 
 
 
@@ -75,7 +78,7 @@ export default function Page() {
       </div>
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
 
-        <TemperaturePlot channelData={channelDataArray} />
+        <TemperaturePlot />
       </div>
       <div className="bg-white w-full h-12 fixed bottom-0 z-10 shadow-md">
         <div className="flex justify-center items-center h-full">
