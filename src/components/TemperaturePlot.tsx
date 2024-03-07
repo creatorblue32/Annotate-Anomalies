@@ -110,41 +110,62 @@ export default function TemperaturePlot() {
       return;
     }
 
+    setChannelData([{
+      time: 0,
+      "No file": 0,
+    }]);
+  
     Papa.parse<ChannelData>(file, {
       header: true,
       dynamicTyping: true,
       skipEmptyLines: true,
       complete: (result) => {
         const data = result.data;
-        const isValid = data.every(d =>
+        const fields = result.meta.fields;
+  
+        // Check if "time" is the first column
+        const isTimeFirstColumn = fields && fields[0] === 'time';
+  
+        // Check for more than 500 rows
+        const isRowLimitExceeded = data.length > 100;
+  
+        // Check for more than 18 columns
+        const isColumnLimitExceeded = fields && fields.length > 18;
+  
+        // Ensure every entry after the header can be parsed to a number
+        const isDataValid = data.every(d =>
           Object.keys(d).every(key =>
-            typeof d[key] === 'number'
+            !isNaN(Number(d[key]))
           )
         );
-
-        if (isValid && result.meta && result.meta.fields) {
-          const fields = result.meta.fields;
-          const firstNonTimeField = fields.find(field => field !== 'time');
-
+  
+        if (isTimeFirstColumn && !isRowLimitExceeded && !isColumnLimitExceeded && isDataValid) {
+          const firstNonTimeField = fields?.find(field => field !== 'time');
           if (firstNonTimeField) {
             setSelectedChannel(firstNonTimeField);
           }
           setIsFileUploaded(true); // Set to true if file is successfully processed
           setChannelData(data);
           setEvents({});
-
+          setGlobalEvents([]);
+          setCaptions({});
         } else {
-          alert('Invalid CSV format.');
+          setChannelData([{
+            time: 0,
+            "No file": 0,
+          }]);
+          setIsFileUploaded(false);
+          alert('Invalid CSV format. Ensure the file meets the specified criteria.');
         }
       },
     });
   };
-
+  
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setNewEvent({ ...newEvent, [e.target.name]: e.target.value });
   };
 
-  const addEvent = () => {
+  const addChannelEvent = () => {
     if (newEvent.time && newEvent.event) {
       if (Number.isNaN(Number(newEvent.time))) {
         alert('Time field is not a number.');
@@ -183,6 +204,24 @@ export default function TemperaturePlot() {
       alert('Please fill in all fields.');
     }
   };
+
+  const deleteChannelEvent = (eventNameToDelete: string) => {  
+    if (events[selectedChannel]) {
+      const updatedChannelEvents = events[selectedChannel].filter(event => event.eventName !== eventNameToDelete);
+      const updatedEvents = { ...events, [selectedChannel]: updatedChannelEvents };
+      setEvents(updatedEvents);
+    } else {
+    }
+  };
+  
+  const deleteGlobalEvent = (eventNameToDelete: string) => {
+    console.log(`Attempting to delete global event with name: ${eventNameToDelete}`);
+    const updatedGlobalEvents = globalEvents.filter(event => event.eventName !== eventNameToDelete);
+    setGlobalEvents(updatedGlobalEvents);
+    console.log(`Global event deleted successfully. Updated global events: `, updatedGlobalEvents);
+  };
+  
+
 
   function interpolateValue(time: number, channel: string): number {
     const times = channelData.map(data => data.time);
@@ -327,7 +366,7 @@ export default function TemperaturePlot() {
             yOffset += (plotHeight * scaleDown) + yGap;
           }
 
-          if (yOffset + (plotHeight * scaleDown) + 70 > pageHeight - margin) {
+          if (yOffset + (plotHeight * scaleDown) + yGap > pageHeight - margin) {
             pdf.addPage();
             yOffset = margin + 30;
             page++;
@@ -345,10 +384,11 @@ export default function TemperaturePlot() {
 
           if (index === 0) {
             pdf.setFontSize(24);
-            pdf.text(`${profile.reportName}`, margin, margin + 5);
+            pdf.text(`${profile.reportName ? profile.reportName : "Anomaly Report:"}`, margin, margin + 5);
             pdf.setFontSize(12);
-            pdf.text("Report Prepared by: " + `${profile.authorName}`, margin, margin + 12);
-
+            if (profile.authorName != ""){
+              pdf.text("Report Prepared by: " + `${profile.authorName}`, margin, margin + 12);
+            }
           }
         });
         pdf.save(`anomaly-report.pdf`);
@@ -358,7 +398,7 @@ export default function TemperaturePlot() {
       });
   };
 
-  const annotations = events ? events[selectedChannel]?.map(event => ({
+  const channelAnnotations = events ? events[selectedChannel]?.map(event => ({
     x: event.time,
     y: interpolateValue(event.time, selectedChannel),
     xref: 'x',
@@ -381,7 +421,7 @@ export default function TemperaturePlot() {
   })) || [] : [];
 
 
-  const criticalAnnotations = globalEvents?.map(event => ({
+  const globalAnnotations = globalEvents?.map(event => ({
     x: event.time,
     y: interpolateValue(event.time, selectedChannel),
     xref: 'x',
@@ -403,7 +443,7 @@ export default function TemperaturePlot() {
     opacity: 1.0
   })) || [];
 
-  const combinedAnnotations = [...annotations, ...criticalAnnotations];
+  const combinedAnnotations = [...channelAnnotations, ...globalAnnotations];
 
   const handleReportNameChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setProfile({ ...profile, reportName: event.target.value });
@@ -430,19 +470,20 @@ export default function TemperaturePlot() {
 
           <div className="flex items-center space-x-2">
             <Popover>
-              <PopoverTrigger><Button variant="outline">   Edit Profile  <ChevronDown className='ml-1 h-4 w-4' /></Button></PopoverTrigger>
+              <PopoverTrigger><Button variant="outline">   Edit Details  <ChevronDown className='ml-1 h-4 w-4' /></Button></PopoverTrigger>
               <PopoverContent className='w-[400px] p-4'>
                 <div className='mr-8'>
-                  <h1 className='ml-4 font-semibold'>Report Name:</h1>
+                <h1 className='ml-2 font-semibold text-xl mb-3'>Report Details:</h1>
+                  <h1 className='ml-2 font-semibold'>Report Name:</h1>
                   <Input
                     value={profile.reportName}
                     onChange={handleReportNameChange}
-                    placeholder='Report Name' className="ml-4 mt-2 mb-2 mr-4"></Input>
-                  <h1 className='ml-4 font-semibold'>Report Author:</h1>
+                    placeholder='Report Name' className="ml-2 mt-2 mb-2 mr-4"></Input>
+                  <h1 className='ml-2 font-semibold'>Report Author:</h1>
                   <Input
                     value={profile.authorName}
                     onChange={handleAuthorNameChange}
-                    placeholder='Author Name' className="ml-4 mt-2 mb-2 mr-4"></Input></div>
+                    placeholder='Author Name' className="ml-2 mt-2 mb-2 mr-4"></Input></div>
               </PopoverContent>
             </Popover>
             <Button onClick={downloadPdf} disabled={!isFileUploaded} className="ml-2 mr-2 button-class">Download Report</Button>
@@ -453,10 +494,11 @@ export default function TemperaturePlot() {
                   <div className='mr-8'>
                     <h1 className='ml-4 mb-2 text-xl font-semibold'>Help/FAQs:</h1>
                     <h2 className='ml-4 font-semibold'>What is this?</h2>
-                    <h3 className='ml-4 mb-2'>This is a webapp to help you build PDF reports of anomalies!</h3>
+                    <h3 className='ml-4 mb-4 text-sm'>This is a webapp to help you build PDF reports to explain or examine anomalies.</h3>
                     <h1 className='ml-4 font-semibold'>How do I use it?</h1>
-                    <h3 className='ml-4 mb-2'>This is a webapp to help you build PDF reports of anomalies!</h3>
-
+                    <h3 className='ml-4 mb-4 text-sm'>First, upload a .csv file. Then, you can add annotations to specific channels, or label events that are important on all channels. Finally, you can download a pdf report with all of the plots and labels you've added.  </h3>
+                    <h1 className='ml-4 font-semibold'>What should my data look like?</h1>
+                    <h3 className='ml-4 mb-4 text-sm'>Your .csv file should have a first column called 'times' and up to 9 additional columns of data. All column data must be numbers, except for the first row, which will be the channel name. </h3>
                   </div>
                 </PopoverContent>
               </Popover>
@@ -555,7 +597,7 @@ export default function TemperaturePlot() {
                               <TableCell>{event.eventName}</TableCell>
                               <TableCell>
                                 <Button variant="outline" className='m-1'>
-                                  <Trash2 className='h-4 w-4' />
+                                <Trash2 className='h-4 w-4' onClick={() => deleteGlobalEvent(event.eventName)} />
                                 </Button>
                               </TableCell>
                             </TableRow>
@@ -609,7 +651,7 @@ export default function TemperaturePlot() {
                               <TableCell>{event.eventName}</TableCell>
                               <TableCell>
                                 <Button variant="outline" className='m-1'>
-                                  <Trash2 className='h-4 w-4' />
+                                <Trash2 className='h-4 w-4' onClick={() => deleteChannelEvent(event.eventName)} />
                                 </Button>
                               </TableCell>
                             </TableRow>
@@ -637,7 +679,7 @@ export default function TemperaturePlot() {
                       className="input-class w-[200px]"
                       disabled={!isFileUploaded}
                     />
-                    <Button onClick={addEvent} disabled={!isFileUploaded} variant="outline" className="button-class">
+                    <Button onClick={addChannelEvent} disabled={!isFileUploaded} variant="outline" className="button-class">
                       Add
                     </Button>
                   </div>
