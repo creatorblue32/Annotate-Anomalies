@@ -496,9 +496,9 @@ export default function TemperaturePlot() {
                     <h2 className='ml-4 font-semibold'>What is this?</h2>
                     <h3 className='ml-4 mb-4 text-sm'>This is a webapp to help you build PDF reports to explain or examine anomalies.</h3>
                     <h1 className='ml-4 font-semibold'>How do I use it?</h1>
-                    <h3 className='ml-4 mb-4 text-sm'>First, upload a .csv file. Then, you can add annotations to specific channels, or label events that are important on all channels. Finally, you can download a pdf report with all of the plots and labels you've added.  </h3>
+                    <h3 className='ml-4 mb-4 text-sm'>First, upload a .csv file. Then, you can add annotations to specific channels, or label events that are important on all channels. Finally, you can download a pdf report with all of the plots and labels you added.  </h3>
                     <h1 className='ml-4 font-semibold'>What should my data look like?</h1>
-                    <h3 className='ml-4 mb-4 text-sm'>Your .csv file should have a first column called 'times' and up to 9 additional columns of data. All column data must be numbers, except for the first row, which will be the channel name. </h3>
+                    <h3 className='ml-4 mb-4 text-sm'>Your .csv file should have a first column called times and up to 9 additional columns of data. All column data must be numbers, except for the first row, which will be the channel name. </h3>
                   </div>
                 </PopoverContent>
               </Popover>
