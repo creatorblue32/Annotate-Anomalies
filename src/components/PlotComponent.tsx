@@ -67,7 +67,7 @@ interface ChannelAnnotationsIndex {
 
 
 
-export default function TemperaturePlot() {
+export default function PlotComponent() {
   const [channelData, setChannelData] = useState<ChannelData[]>([{
     time: 0,
     "No file": 0,
@@ -114,7 +114,7 @@ export default function TemperaturePlot() {
       time: 0,
       "No file": 0,
     }]);
-  
+
     Papa.parse<ChannelData>(file, {
       header: true,
       dynamicTyping: true,
@@ -122,23 +122,23 @@ export default function TemperaturePlot() {
       complete: (result) => {
         const data = result.data;
         const fields = result.meta.fields;
-  
+
         // Check if "time" is the first column
         const isTimeFirstColumn = fields && fields[0] === 'time';
-  
+
         // Check for more than 500 rows
-        const isRowLimitExceeded = data.length > 100;
-  
+        const isRowLimitExceeded = data.length > 150;
+
         // Check for more than 18 columns
         const isColumnLimitExceeded = fields && fields.length > 18;
-  
+
         // Ensure every entry after the header can be parsed to a number
         const isDataValid = data.every(d =>
           Object.keys(d).every(key =>
             !isNaN(Number(d[key]))
           )
         );
-  
+
         if (isTimeFirstColumn && !isRowLimitExceeded && !isColumnLimitExceeded && isDataValid) {
           const firstNonTimeField = fields?.find(field => field !== 'time');
           if (firstNonTimeField) {
@@ -160,7 +160,7 @@ export default function TemperaturePlot() {
       },
     });
   };
-  
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setNewEvent({ ...newEvent, [e.target.name]: e.target.value });
   };
@@ -205,7 +205,7 @@ export default function TemperaturePlot() {
     }
   };
 
-  const deleteChannelEvent = (eventNameToDelete: string) => {  
+  const deleteChannelEvent = (eventNameToDelete: string) => {
     if (events[selectedChannel]) {
       const updatedChannelEvents = events[selectedChannel].filter(event => event.eventName !== eventNameToDelete);
       const updatedEvents = { ...events, [selectedChannel]: updatedChannelEvents };
@@ -213,14 +213,14 @@ export default function TemperaturePlot() {
     } else {
     }
   };
-  
+
   const deleteGlobalEvent = (eventNameToDelete: string) => {
     console.log(`Attempting to delete global event with name: ${eventNameToDelete}`);
     const updatedGlobalEvents = globalEvents.filter(event => event.eventName !== eventNameToDelete);
     setGlobalEvents(updatedGlobalEvents);
     console.log(`Global event deleted successfully. Updated global events: `, updatedGlobalEvents);
   };
-  
+
 
 
   function interpolateValue(time: number, channel: string): number {
@@ -379,14 +379,14 @@ export default function TemperaturePlot() {
           pdf.setFontSize(14);
           pdf.text(`${title}`, xOffset, yOffset - 2);
 
-          pdf.setFontSize(8);
+          pdf.setFontSize(6);
           pdf.text(title ? (captions[title] || "") : "", xOffset, yOffset + 6 + (plotHeight * scaleDown));
 
           if (index === 0) {
             pdf.setFontSize(24);
             pdf.text(`${profile.reportName ? profile.reportName : "Anomaly Report:"}`, margin, margin + 5);
             pdf.setFontSize(12);
-            if (profile.authorName != ""){
+            if (profile.authorName != "") {
               pdf.text("Report Prepared by: " + `${profile.authorName}`, margin, margin + 12);
             }
           }
@@ -473,7 +473,7 @@ export default function TemperaturePlot() {
               <PopoverTrigger><Button variant="outline">   Edit Details  <ChevronDown className='ml-1 h-4 w-4' /></Button></PopoverTrigger>
               <PopoverContent className='w-[400px] p-4'>
                 <div className='mr-8'>
-                <h1 className='ml-2 font-semibold text-xl mb-3'>Report Details:</h1>
+                  <h1 className='ml-2 font-semibold text-xl mb-3'>Report Details:</h1>
                   <h1 className='ml-2 font-semibold'>Report Name:</h1>
                   <Input
                     value={profile.reportName}
@@ -498,7 +498,7 @@ export default function TemperaturePlot() {
                     <h1 className='ml-4 font-semibold'>How do I use it?</h1>
                     <h3 className='ml-4 mb-4 text-sm'>First, upload a .csv file. Then, you can add annotations to specific channels, or label events that are important on all channels. Finally, you can download a pdf report with all of the plots and labels you added.  </h3>
                     <h1 className='ml-4 font-semibold'>What should my data look like?</h1>
-                    <h3 className='ml-4 mb-4 text-sm'>Your .csv file should have a first column called times and up to 9 additional columns of data. All column data must be numbers, except for the first row, which will be the channel name. </h3>
+                    <h3 className='ml-4 mb-4 text-sm'>Your .csv file should have a first column called times and up to 9 additional columns / 100 additional rows of data. All column data must be numbers, except for the first row, which will be the channel name. </h3>
                   </div>
                 </PopoverContent>
               </Popover>
@@ -547,8 +547,9 @@ export default function TemperaturePlot() {
                       family: "Inter",
                       size: 12,
                     },
-                    margin: { l: 50, r: 20, t: 20, b: 20 }
+                    margin: { l: 50, r: 20, t: 20, b: 20 },
                   }}
+                  config={{ displayModeBar: false }}
                   ref={plotRef}
                   className="w-[600px] h-[400px]"
                 />
@@ -597,7 +598,7 @@ export default function TemperaturePlot() {
                               <TableCell>{event.eventName}</TableCell>
                               <TableCell>
                                 <Button variant="outline" className='m-1'>
-                                <Trash2 className='h-4 w-4' onClick={() => deleteGlobalEvent(event.eventName)} />
+                                  <Trash2 className='h-4 w-4' onClick={() => deleteGlobalEvent(event.eventName)} />
                                 </Button>
                               </TableCell>
                             </TableRow>
@@ -651,7 +652,7 @@ export default function TemperaturePlot() {
                               <TableCell>{event.eventName}</TableCell>
                               <TableCell>
                                 <Button variant="outline" className='m-1'>
-                                <Trash2 className='h-4 w-4' onClick={() => deleteChannelEvent(event.eventName)} />
+                                  <Trash2 className='h-4 w-4' onClick={() => deleteChannelEvent(event.eventName)} />
                                 </Button>
                               </TableCell>
                             </TableRow>
