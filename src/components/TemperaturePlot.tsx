@@ -44,6 +44,8 @@ import { select } from 'd3';
 import { Check } from 'lucide-react';
 import Papa from 'papaparse';
 import { ScatterData } from 'plotly.js';
+import { HelpCircle } from 'lucide-react';
+
 
 
 
@@ -66,28 +68,18 @@ interface ChannelAnnotationsIndex {
 
 
 export default function TemperaturePlot() {
-
   const [channelData, setChannelData] = useState<ChannelData[]>([{
     time: 0,
     "No file": 0,
   }]);
-
   const [events, setEvents] = useState<ChannelAnnotationsIndex>({});
-
   const [globalEvents, setGlobalEvents] = useState<ChannelEvent[]>([]);
-
   const [newEvent, setNewEvent] = useState<{ time: string; event: string }>({ time: '', event: '' });
-
   const [profile, setProfile] = useState<{ reportName: string; authorName: string }>({ reportName: '', authorName: '' });
-
   const [selectedChannel, setSelectedChannel] = useState<string>('');
-
   const channels = Object.keys(channelData[0]).filter(key => key !== 'time');
-
   const plotRef = useRef<any>(null);
-
   const [isFileUploaded, setIsFileUploaded] = useState<boolean>(false);
-
   const [captions, setCaptions] = useState<{ [channel: string]: string }>({});
 
 
@@ -311,16 +303,15 @@ export default function TemperaturePlot() {
       const plotId = `hidden-plot-${index}`;
       const plotDiv = document.createElement('div');
       plotDiv.id = plotId;
-      plotDiv.style.display = 'none'; // Hide the plot div
+      plotDiv.style.display = 'none';
       document.body.appendChild(plotDiv);
 
 
       return Plotly.newPlot(plotId, [data], plotsLayout(data.name), { displayModeBar: false })
         .then(() => Plotly.toImage(plotId, { format: 'png', width: plotWidth, height: plotHeight }))
         .then((dataUrl: string) => {
-          // Remove the hidden plot div from the DOM after exporting its image
           plotDiv.remove();
-          return { imageUrl: dataUrl, title: data.name }; // Return image URL and plot title
+          return { imageUrl: dataUrl, title: data.name };
         });
     });
 
@@ -329,18 +320,16 @@ export default function TemperaturePlot() {
         const pdf = new JsPDF({
           orientation: 'portrait',
         });
-
-        let yOffset = margin + 30; // Adjusted for header
+        let yOffset = margin + 30;
         let page = 1;
-
         imageDataArray.forEach(({ imageUrl, title }, index) => {
           if (index > 0 && index % 2 === 0) {
-            yOffset += (plotHeight * scaleDown) + yGap; // Move to the next row
+            yOffset += (plotHeight * scaleDown) + yGap;
           }
 
           if (yOffset + (plotHeight * scaleDown) + 70 > pageHeight - margin) {
-            pdf.addPage(); // Add a new page if there's not enough space for the next plot
-            yOffset = margin + 30; // Reset to margin + header height
+            pdf.addPage();
+            yOffset = margin + 30;
             page++;
           }
 
@@ -435,23 +424,43 @@ export default function TemperaturePlot() {
     <div>
       <Card className='mb-3 p-2'>
         <div className="flex justify-between items-center">
-          <Input type="file" className='w-[250px]' accept=".csv" onChange={handleFileUpload} />
-          <div>
+          <div className="flex items-center space-x-2">
+            <Input type="file" className='w-[250px]' accept=".csv" onChange={handleFileUpload} />
+          </div>
+
+          <div className="flex items-center space-x-2">
             <Popover>
               <PopoverTrigger><Button variant="outline">   Edit Profile  <ChevronDown className='ml-1 h-4 w-4' /></Button></PopoverTrigger>
               <PopoverContent className='w-[400px] p-4'>
-                <div className='mr-6'>
+                <div className='mr-8'>
+                  <h1 className='ml-4 font-semibold'>Report Name:</h1>
                   <Input
                     value={profile.reportName}
                     onChange={handleReportNameChange}
-                    placeholder='Report Name' className="m-4"></Input>
+                    placeholder='Report Name' className="ml-4 mt-2 mb-2 mr-4"></Input>
+                  <h1 className='ml-4 font-semibold'>Report Author:</h1>
                   <Input
                     value={profile.authorName}
                     onChange={handleAuthorNameChange}
-                    placeholder='Author Name' className="m-4"></Input></div>
+                    placeholder='Author Name' className="ml-4 mt-2 mb-2 mr-4"></Input></div>
               </PopoverContent>
             </Popover>
-            <Button onClick={downloadPdf} disabled={!isFileUploaded} className="ml-2 button-class">Download Report</Button>
+            <Button onClick={downloadPdf} disabled={!isFileUploaded} className="ml-2 mr-2 button-class">Download Report</Button>
+            <div className=''>
+              <Popover>
+                <PopoverTrigger><Button variant="outline" className=''>    <HelpCircle className='h-4 w-4' /></Button></PopoverTrigger>
+                <PopoverContent className='w-[400px] p-4'>
+                  <div className='mr-8'>
+                    <h1 className='ml-4 mb-2 text-xl font-semibold'>Help/FAQs:</h1>
+                    <h2 className='ml-4 font-semibold'>What is this?</h2>
+                    <h3 className='ml-4 mb-2'>This is a webapp to help you build PDF reports of anomalies!</h3>
+                    <h1 className='ml-4 font-semibold'>How do I use it?</h1>
+                    <h3 className='ml-4 mb-2'>This is a webapp to help you build PDF reports of anomalies!</h3>
+
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
         </div>
       </Card>
@@ -523,11 +532,11 @@ export default function TemperaturePlot() {
           <div className="card-class flex ml-5 w-[400px] h-[550px]">
             <Tabs defaultValue="events" className="w-[400px] mr-4 mt-6">
               <TabsList className='w-[400px] text-xl'>
-                <TabsTrigger value="events" className='w-[200px]'><div className='w-5 h-2.5 bg-[#fa7316] mr-2 rounded-sm'></div>Critical Events</TabsTrigger>
-                <TabsTrigger value="annotations" className='w-[200px]'><div className='w-5 h-2.5 bg-[#64748b] mr-2 rounded-sm'></div>Annotations</TabsTrigger>
+                <TabsTrigger value="events" className='w-[200px]'><div className='w-5 h-2.5 bg-[#fa7316] mr-2 rounded-sm'></div>Global Events</TabsTrigger>
+                <TabsTrigger value="annotations" className='w-[200px]'><div className='w-5 h-2.5 bg-[#64748b] mr-2 rounded-sm'></div>Channel Events</TabsTrigger>
               </TabsList>
               <TabsContent value="events">
-                <CardDescription className='ml-3 mt-4 mb-4'>Label critical events here. These will be visible on all channel plots.</CardDescription>
+                <CardDescription className='ml-3 mt-4 mb-4'>Label global events here. These annotations will be visible on all channel plots.</CardDescription>
                 <div className="">
                   <ScrollArea className=" w-150 h-[354px] rounded-md border-0 mr-5">
                     <Table>
