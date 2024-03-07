@@ -1,4 +1,3 @@
-// src/pages/page.tsx
 
 import dynamic from 'next/dynamic';
 import {
@@ -11,11 +10,10 @@ import {
 } from "@/components/ui/card"
 import { BarChart3 } from 'lucide-react';
 import { Metadata } from 'next';
-import PlotComponent from '../components/PlotComponent';
 
 
 
-const TemperaturePlot = dynamic(() => import('../components/PlotComponent'), {
+const PlotComponent = dynamic(() => import('../components/PlotComponent'), {
   ssr: false
 });
 
@@ -40,7 +38,6 @@ export default function Page() {
           <BarChart3 className='mr-1' /><span>AnomalyReport</span></h1>
       </div>
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-
         <PlotComponent />
       </div>
       <div className="bg-white w-full h-12 fixed bottom-0 z-10 shadow-md">

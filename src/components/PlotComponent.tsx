@@ -688,12 +688,9 @@ export default function PlotComponent() {
 
               </TabsContent>
             </Tabs>
-
           </div>
-
         </div>
       </Card>
-
     </div>
 
   );
