@@ -33,7 +33,7 @@ export default function Page() {
 
   return (
     <div>
-      <div className="bg-white w-full h-16 fixed top-0 z-10 shadow-md">
+      <div className="bg-white w-full h-16 fixed top-0 z-10">
         <h1 className="flex items-center font-semibold  m-4 text-xl">
           <BarChart3 className='mr-1' /><span>AnomalyReport</span></h1>
       </div>

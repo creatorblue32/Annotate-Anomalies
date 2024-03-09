@@ -155,7 +155,7 @@ export default function PlotComponent() {
             "No file": 0,
           }]);
           setIsFileUploaded(false);
-          alert('Invalid CSV format. Ensure the file meets the specified criteria.');
+          alert('Invalid CSV format. Ensure the file meets the specified criteria. For more information, click the Help button (?)');
         }
       },
     });
