@@ -123,28 +123,24 @@ export default function PlotComponent() {
         const data = result.data;
         const fields = result.meta.fields;
 
-        // Check if "time" is the first column
         const isTimeFirstColumn = fields && fields[0] === 'time';
 
-        // Check for more than 500 rows
-        const isRowLimitExceeded = data.length > 150;
 
-        // Check for more than 18 columns
-        const isColumnLimitExceeded = fields && fields.length > 18;
+        // Check for more than 40 columns
+        const isColumnLimitExceeded = fields && fields.length > 40;
 
-        // Ensure every entry after the header can be parsed to a number
         const isDataValid = data.every(d =>
           Object.keys(d).every(key =>
             !isNaN(Number(d[key]))
           )
         );
 
-        if (isTimeFirstColumn && !isRowLimitExceeded && !isColumnLimitExceeded && isDataValid) {
+        if (isTimeFirstColumn && !isColumnLimitExceeded && isDataValid) {
           const firstNonTimeField = fields?.find(field => field !== 'time');
           if (firstNonTimeField) {
             setSelectedChannel(firstNonTimeField);
           }
-          setIsFileUploaded(true); // Set to true if file is successfully processed
+          setIsFileUploaded(true);
           setChannelData(data);
           setEvents({});
           setGlobalEvents([]);
